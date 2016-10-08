@@ -125,6 +125,21 @@ func (c *MgmtClient) SetStateEvents(on bool) error {
 	return err
 }
 
+// SetEchoEvents either enables or disables asynchronous events for "echo"
+// commands sent from a remote server to our managed OpenVPN client.
+//
+// When enabled, an EchoEvent will be emitted from the event channel each
+// time the server sends an echo command. See EchoEvent for more information.
+func (c *MgmtClient) SetEchoEvents(on bool) error {
+	var err error
+	if on {
+		_, err = c.simpleCommand("echo on")
+	} else {
+		_, err = c.simpleCommand("echo off")
+	}
+	return err
+}
+
 func (c *MgmtClient) sendCommand(cmd []byte) error {
 	_, err := c.wr.Write(cmd)
 	if err != nil {
