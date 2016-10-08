@@ -155,6 +155,23 @@ func (c *MgmtClient) SetByteCountEvents(interval time.Duration) error {
 	return err
 }
 
+// SendSignal sends a signal to the OpenVPN process via the management
+// channel. In effect this causes the OpenVPN process to send a signal to
+// itself on our behalf.
+//
+// OpenVPN accepts a subset of the usual UNIX signal names, including
+// "SIGHUP", "SIGTERM", "SIGUSR1" and "SIGUSR2". See the OpenVPN manual
+// page for the meaning of each.
+//
+// Behavior is undefined if the given signal name is not entirely uppercase
+// letters. In particular, including newlines in the string is likely to
+// cause very unpredictable behavior.
+func (c *MgmtClient) SendSignal(name string) error {
+	msg := fmt.Sprintf("signal %q", name)
+	_, err := c.simpleCommand(msg)
+	return err
+}
+
 func (c *MgmtClient) sendCommand(cmd []byte) error {
 	_, err := c.wr.Write(cmd)
 	if err != nil {
