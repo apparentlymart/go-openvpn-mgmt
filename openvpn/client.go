@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/apparentlymart/go-openvpn-mgmt/demux"
 )
@@ -137,6 +138,20 @@ func (c *MgmtClient) SetEchoEvents(on bool) error {
 	} else {
 		_, err = c.simpleCommand("echo off")
 	}
+	return err
+}
+
+// SetByteCountEvents either enables or disables ongoing asynchronous events
+// for information on OpenVPN bandwidth usage.
+//
+// When enabled, a ByteCountEvent will be emitted at given time interval,
+// (which may only be whole seconds) describing how many bytes have been
+// transferred in each direction See ByteCountEvent for more information.
+//
+// Set the time interval to zero in order to disable byte count events.
+func (c *MgmtClient) SetByteCountEvents(interval time.Duration) error {
+	msg := fmt.Sprintf("bytecount %d", int(interval.Seconds()))
+	_, err := c.simpleCommand(msg)
 	return err
 }
 

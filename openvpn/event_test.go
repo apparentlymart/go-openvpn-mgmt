@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+// A key requirement of our event parsing is that it must never cause a
+// panic, even if the OpenVPN process sends us malformed garbage.
+//
+// Therefore most of the tests in here are testing various tortured error
+// cases, which are all expected to produce an event object, though the
+// contents of that event object will be nonsensical if the OpenVPN server
+// sends something nonsensical.
+
 func TestMalformedEvent(t *testing.T) {
 	testCases := [][]byte{
 		[]byte(""),
@@ -228,6 +236,111 @@ func TestStateEvent(t *testing.T) {
 		}
 		if got, want := st.RemoteAddr(), testCase.WantRemoteAddr; got != want {
 			t.Errorf("test %d RemoteAddr returned %q; want %q", i, got, want)
+		}
+	}
+}
+
+func TestByteCountEvent(t *testing.T) {
+	type TestCase struct {
+		Input        []byte
+		WantClientId string
+		WantBytesIn  int
+		WantBytesOut int
+	}
+	testCases := []TestCase{
+		{
+			Input:        []byte("BYTECOUNT:"),
+			WantClientId: "",
+			WantBytesIn:  0,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT:123,456"),
+			WantClientId: "",
+			WantBytesIn:  123,
+			WantBytesOut: 456,
+		},
+		{
+			Input:        []byte("BYTECOUNT:,"),
+			WantClientId: "",
+			WantBytesIn:  0,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT:5,"),
+			WantClientId: "",
+			WantBytesIn:  5,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT:,6"),
+			WantClientId: "",
+			WantBytesIn:  0,
+			WantBytesOut: 6,
+		},
+		{
+			Input:        []byte("BYTECOUNT:6"),
+			WantClientId: "",
+			WantBytesIn:  6,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT:wrong,bad"),
+			WantClientId: "",
+			WantBytesIn:  0,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT:1,2,3"),
+			WantClientId: "",
+			WantBytesIn:  1,
+			WantBytesOut: 2,
+		},
+		{
+			// Intentionally malformed BYTECOUNT event sent as BYTECOUNT_CLI
+			Input:        []byte("BYTECOUNT_CLI:123,456"),
+			WantClientId: "123",
+			WantBytesIn:  456,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT_CLI:"),
+			WantClientId: "",
+			WantBytesIn:  0,
+			WantBytesOut: 0,
+		},
+		{
+			Input:        []byte("BYTECOUNT_CLI:abc123,123,456"),
+			WantClientId: "abc123",
+			WantBytesIn:  123,
+			WantBytesOut: 456,
+		},
+		{
+			Input:        []byte("BYTECOUNT_CLI:abc123,123"),
+			WantClientId: "abc123",
+			WantBytesIn:  123,
+			WantBytesOut: 0,
+		},
+	}
+
+	for i, testCase := range testCases {
+		event := upgradeEvent(testCase.Input)
+
+		var bc *ByteCountEvent
+		var ok bool
+		if bc, ok = event.(*ByteCountEvent); !ok {
+			t.Errorf("test %d got %T; want %T", i, event, bc)
+			continue
+		}
+
+		if got, want := bc.ClientId(), testCase.WantClientId; got != want {
+			t.Errorf("test %d ClientId returned %q; want %q", i, got, want)
+		}
+		if got, want := bc.BytesIn(), testCase.WantBytesIn; got != want {
+			t.Errorf("test %d BytesIn returned %d; want %d", i, got, want)
+		}
+		if got, want := bc.BytesOut(), testCase.WantBytesOut; got != want {
+			t.Errorf("test %d BytesOut returned %d; want %d", i, got, want)
 		}
 	}
 }

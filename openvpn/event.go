@@ -3,12 +3,13 @@ package openvpn
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 )
 
 var eventSep = []byte(":")
 var fieldSep = []byte(",")
-var bytecountEventKW = []byte("BYTECOUNT")
-var bytecountCliEventKW = []byte("BYTECOUNT_CLI")
+var byteCountEventKW = []byte("BYTECOUNT")
+var byteCountCliEventKW = []byte("BYTECOUNT_CLI")
 var clientEventKW = []byte("CLIENT")
 var echoEventKW = []byte("ECHO")
 var fatalEventKW = []byte("FATAL")
@@ -153,7 +154,7 @@ func (e *StateEvent) parts() [][]byte {
 		// the server is behaving itself.
 		if len(e.bodyParts) < 5 {
 			expanded := make([][]byte, 5)
-			copy(e.bodyParts, expanded)
+			copy(expanded, e.bodyParts)
 			e.bodyParts = expanded
 		}
 	}
@@ -193,6 +194,84 @@ func (e *EchoEvent) String() string {
 	return fmt.Sprintf("ECHO: %s", e.Message())
 }
 
+// ByteCountEvent represents a periodic snapshot of data transfer in bytes
+// on a VPN connection.
+//
+// For OpenVPN *servers*, events are emitted for each client and the method
+// ClientId identifies thet client.
+//
+// For other OpenVPN modes, events are emitted only once per interval for the
+// single connection managed by the target process, and ClientId returns
+// the empty string.
+type ByteCountEvent struct {
+	hasClient bool
+	body      []byte
+
+	// populated on first call to parts()
+	bodyParts [][]byte
+}
+
+func (e *ByteCountEvent) ClientId() string {
+	if !e.hasClient {
+		return ""
+	}
+
+	return string(e.parts()[0])
+}
+
+func (e *ByteCountEvent) BytesIn() int {
+	index := 0
+	if e.hasClient {
+		index = 1
+	}
+	str := string(e.parts()[index])
+	val, _ := strconv.Atoi(str)
+	// Ignore error, since this should never happen if OpenVPN is
+	// behaving itself.
+	return val
+}
+
+func (e *ByteCountEvent) BytesOut() int {
+	index := 1
+	if e.hasClient {
+		index = 2
+	}
+	str := string(e.parts()[index])
+	val, _ := strconv.Atoi(str)
+	// Ignore error, since this should never happen if OpenVPN is
+	// behaving itself.
+	return val
+}
+
+func (e *ByteCountEvent) String() string {
+	if e.hasClient {
+		return fmt.Sprintf("Client %s: %d in, %d out", e.ClientId(), e.BytesIn(), e.BytesOut())
+	} else {
+		return fmt.Sprintf("%d in, %d out", e.BytesIn(), e.BytesOut())
+	}
+}
+
+func (e *ByteCountEvent) parts() [][]byte {
+	if e.bodyParts == nil {
+		e.bodyParts = bytes.SplitN(e.body, fieldSep, 4)
+
+		wantCount := 2
+		if e.hasClient {
+			wantCount = 3
+		}
+
+		// Prevent crash if the server has sent us a malformed
+		// message. This should never actually happen if the
+		// server is behaving itself.
+		if len(e.bodyParts) < wantCount {
+			expanded := make([][]byte, wantCount)
+			copy(expanded, e.bodyParts)
+			e.bodyParts = expanded
+		}
+	}
+	return e.bodyParts
+}
+
 func upgradeEvent(raw []byte) Event {
 	splitIdx := bytes.Index(raw, eventSep)
 	if splitIdx == -1 {
@@ -210,6 +289,10 @@ func upgradeEvent(raw []byte) Event {
 		return &HoldEvent{body}
 	case bytes.Equal(keyword, echoEventKW):
 		return &EchoEvent{body}
+	case bytes.Equal(keyword, byteCountEventKW):
+		return &ByteCountEvent{hasClient: false, body: body}
+	case bytes.Equal(keyword, byteCountCliEventKW):
+		return &ByteCountEvent{hasClient: true, body: body}
 	default:
 		return &UnknownEvent{keyword, body}
 	}
