@@ -81,8 +81,19 @@ func NewClient(conn io.ReadWriter, eventCh chan<- Event) *MgmtClient {
 //
 // Address may an IPv4 address, an IPv6 address, or a hostname that resolves
 // to either of these, followed by a colon and then a port number.
+//
+// When running on Unix systems it's possible to instead connect to a Unix
+// domain socket. To do this, pass an absolute path to the socket as
+// the target address, having run OpenVPN with the following options:
+//
+//    --management /path/to/socket unix
+//
 func Dial(addr string, eventCh chan<- Event) (*MgmtClient, error) {
-	conn, err := net.Dial("tcp", addr)
+	proto := "tcp"
+	if len(addr) > 0 && addr[0] == '/' {
+		proto = "unix"
+	}
+	conn, err := net.Dial(proto, addr)
 	if err != nil {
 		return nil, err
 	}

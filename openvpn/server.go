@@ -33,8 +33,19 @@ func NewMgmtListener(l net.Listener) *MgmtListener {
 // is indistinguishable from the situation where OpenVPN exposed a management
 // *server* and we connected to it. Thus we still refer to our program as
 // the "client" and OpenVPN as the "server" once the connection is established.
+//
+// When running on Unix systems it's possible to instead listen on a Unix
+// domain socket. To do this, pass an absolute path to the socket as
+// the listen address, and then run OpenVPN with the following options:
+//
+//    --management /path/to/socket unix --management-client
+//
 func Listen(laddr string) (*MgmtListener, error) {
-	listener, err := net.Listen("tcp", laddr)
+	proto := "tcp"
+	if len(laddr) > 0 && laddr[0] == '/' {
+		proto = "unix"
+	}
+	listener, err := net.Listen(proto, laddr)
 	if err != nil {
 		return nil, err
 	}
