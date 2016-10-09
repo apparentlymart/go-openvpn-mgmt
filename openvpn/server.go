@@ -68,7 +68,7 @@ func (l *MgmtListener) Addr() net.Addr {
 //
 // Serve does not return unless the listen port is closed; a non-nil
 // error is always returned.
-func (l *MgmtListener) Serve(handler IncomingConnHandlerFunc) error {
+func (l *MgmtListener) Serve(handler IncomingConnHandler) error {
 	defer l.Close()
 
 	var tempDelay time.Duration
@@ -94,12 +94,12 @@ func (l *MgmtListener) Serve(handler IncomingConnHandlerFunc) error {
 				// so it's time for us to exit.
 				return err
 			}
-
-			// always reset our retry delay once we successfully read
-			tempDelay = 0
-
-			go handler.ServeOpenVPNMgmt(*incoming)
 		}
+
+		// always reset our retry delay once we successfully read
+		tempDelay = 0
+
+		go handler.ServeOpenVPNMgmt(*incoming)
 	}
 }
 
@@ -151,7 +151,7 @@ func (f IncomingConnHandlerFunc) ServeOpenVPNMgmt(i IncomingConn) {
 // except on error; in addition to the error cases handled by AcceptAndServe,
 // this function may also fail if the listen socket cannot be established
 // in the first place.
-func ListenAndServe(laddr string, handler IncomingConnHandlerFunc) error {
+func ListenAndServe(laddr string, handler IncomingConnHandler) error {
 	listener, err := Listen(laddr)
 	if err != nil {
 		return err
