@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/apparentlymart/go-openvpn-mgmt/demux"
@@ -194,6 +195,25 @@ func (c *MgmtClient) LatestState() (*StateEvent, error) {
 	return &StateEvent{
 		body: payload[0],
 	}, nil
+}
+
+// Pid retrieves the process id of the connected OpenVPN process.
+func (c *MgmtClient) Pid() (int, error) {
+	raw, err := c.simpleCommand("pid")
+	if err != nil {
+		return 0, err
+	}
+
+	if !bytes.HasPrefix(raw, []byte("pid=")) {
+		return 0, fmt.Errorf("malformed response from OpenVPN")
+	}
+
+	pid, err := strconv.Atoi(string(raw[4:]))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing pid from OpenVPN: %s", err)
+	}
+
+	return pid, nil
 }
 
 func (c *MgmtClient) sendCommand(cmd []byte) error {
