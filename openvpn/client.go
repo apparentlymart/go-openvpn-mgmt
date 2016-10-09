@@ -172,6 +172,30 @@ func (c *MgmtClient) SendSignal(name string) error {
 	return err
 }
 
+// LatestState retrieves the most recent StateEvent from the server. This
+// can either be used to poll the state or it can be used to determine the
+// initial state after calling SetStateEvents(true) but before the first
+// state event is delivered.
+func (c *MgmtClient) LatestState() (*StateEvent, error) {
+	err := c.sendCommand([]byte("state"))
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := c.readCommandResponsePayload()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(payload) != 1 {
+		return nil, fmt.Errorf("Malformed OpenVPN 'state' response")
+	}
+
+	return &StateEvent{
+		body: payload[0],
+	}, nil
+}
+
 func (c *MgmtClient) sendCommand(cmd []byte) error {
 	_, err := c.wr.Write(cmd)
 	if err != nil {
