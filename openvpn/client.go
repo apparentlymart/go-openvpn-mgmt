@@ -229,7 +229,7 @@ func (c *MgmtClient) LatestStatus(statusFormat StatusFormat) ([][]byte, error) {
 	} else {
 		return nil, fmt.Errorf("Incorrect 'status' format option")
 	}
-	err := c.sendCommand([]byte("status"))
+	err := c.sendCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
