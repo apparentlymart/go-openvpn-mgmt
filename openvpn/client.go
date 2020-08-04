@@ -208,6 +208,21 @@ func (c *MgmtClient) LatestState() (*StateEvent, error) {
 	}, nil
 }
 
+// LatestStatus .
+func (c *MgmtClient) LatestStatus() ([][]byte, error) {
+	err := c.sendCommand([]byte("status"))
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := c.readCommandResponsePayload()
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
 // Pid retrieves the process id of the connected OpenVPN process.
 func (c *MgmtClient) Pid() (int, error) {
 	raw, err := c.simpleCommand("pid")
