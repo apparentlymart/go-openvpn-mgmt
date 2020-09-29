@@ -16,6 +16,17 @@ var successPrefix = []byte("SUCCESS: ")
 var errorPrefix = []byte("ERROR: ")
 var endMessage = []byte("END")
 
+// StatusFormat enum type
+type StatusFormat string
+
+// StatusFormatDefault openvpn default status format
+// StatusFormatV3 openvpn version 3 status format
+const (
+	StatusFormatDefault StatusFormat = ""
+	StatusFormatV3      StatusFormat = "3"
+)
+
+// MgmtClient .
 type MgmtClient struct {
 	wr      io.Writer
 	replies <-chan []byte
@@ -206,6 +217,29 @@ func (c *MgmtClient) LatestState() (*StateEvent, error) {
 	return &StateEvent{
 		body: payload[0],
 	}, nil
+}
+
+// LatestStatus retrieves the current daemon status information, in the same format as that produced by the OpenVPN --status directive.
+func (c *MgmtClient) LatestStatus(statusFormat StatusFormat) ([][]byte, error) {
+	var cmd []byte
+	if statusFormat == StatusFormatDefault {
+		cmd = []byte("status")
+	} else if statusFormat == StatusFormatV3 {
+		cmd = []byte("status 3")
+	} else {
+		return nil, fmt.Errorf("Incorrect 'status' format option")
+	}
+	err := c.sendCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := c.readCommandResponsePayload()
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
 }
 
 // Pid retrieves the process id of the connected OpenVPN process.
